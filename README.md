@@ -217,14 +217,15 @@ cd muzeeng
 ### Step 2: Install Go dependencies inside each service
 go mod tidy
 
-### Step 3: Generate gRPC code from proto files
+### Step 3: Generate gRPC code from proto files inside each service
 protoc --go_out=pb --go-grpc_out=pb proto/*.proto
 
 ### Step 4: Generate GraphQL types & resolvers
 cd api-gateway
+
 gqlgen generate
 
-### Step 5: Build Docker images and Running the Project using BASH script file
+### Step 5: Build Docker images and Running the Project using BASH script file at root folder
 ./run-all.sh   
 
 ### Step 6: Kill Docker Container and Stop the Project
