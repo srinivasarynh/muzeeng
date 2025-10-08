@@ -1,0 +1,481 @@
+version: "3.8"
+
+services:
+  # ----------------------------
+  # NATS
+  # ----------------------------
+  nats:
+    image: nats:2.9.21-alpine
+    container_name: nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # ----------------------------
+  # Auth Service
+  # ----------------------------
+  auth-db:
+    image: postgres:15-alpine
+    container_name: auth_service_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: auth_service_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - auth_pgdata:/var/lib/postgresql/data
+      - ./auth-service/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile  # ← Fixed (removed duplicate path)
+    container_name: auth-service
+    ports:
+      - "50051:50051"
+    environment:
+      AUTH_DB_HOST: auth-db
+      AUTH_DB_PORT: 5432
+      AUTH_DB_USER: postgres
+      AUTH_DB_PASSWORD: postgres
+      AUTH_DB_NAME: auth_service_db
+      AUTH_DB_SSLMODE: disable
+      GRPC_PORT: 50051
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # ----------------------------
+  # User Service
+  # ----------------------------
+  user-db:
+    image: postgres:15-alpine
+    container_name: user_service_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: user_service_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - user_pgdata:/var/lib/postgresql/data
+      - ./user-service/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    container_name: user-service
+    ports:
+      - "50052:50052"
+    environment:
+      USER_DB_HOST: user-db
+      USER_DB_PORT: 5432
+      USER_DB_USER: postgres
+      USER_DB_PASSWORD: postgres
+      USER_DB_NAME: user_service_db
+      USER_DB_SSLMODE: disable
+      GRPC_PORT: 50052
+    depends_on:
+      user-db:
+        condition: service_healthy
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # ----------------------------
+  # Post Service
+  # ----------------------------
+  post-db:
+    image: postgres:15-alpine
+    container_name: post_service_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: post_service_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - post_pgdata:/var/lib/postgresql/data
+      - ./post-service/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  post-service:
+    build:
+      context: ./post-service
+      dockerfile: Dockerfile
+    container_name: post-service
+    ports:
+      - "50053:50053"
+    environment:
+      POST_DB_HOST: post-db
+      POST_DB_PORT: 5432
+      POST_DB_USER: postgres
+      POST_DB_PASSWORD: postgres
+      POST_DB_NAME: post_service_db
+      POST_DB_SSLMODE: disable
+      GRPC_PORT: 50053
+    depends_on:
+      post-db:
+        condition: service_healthy
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # ----------------------------
+  # Comment Service
+  # ----------------------------
+  comment-db:
+    image: postgres:15-alpine
+    container_name: comment_service_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: comment_service_db
+    ports:
+      - "5436:5432"
+    volumes:
+      - comment_pgdata:/var/lib/postgresql/data
+      - ./comment-service/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  comment-service:
+    build:
+      context: ./comment-service
+      dockerfile: Dockerfile
+    container_name: comment-service
+    ports:
+      - "50056:50056"
+    environment:
+      COMMENT_DB_HOST: comment-db
+      COMMENT_DB_PORT: 5432
+      COMMENT_DB_USER: postgres
+      COMMENT_DB_PASSWORD: postgres
+      COMMENT_DB_NAME: comment_service_db
+      COMMENT_DB_SSLMODE: disable
+      GRPC_PORT: 50056
+    depends_on:
+      comment-db:
+        condition: service_healthy
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # ----------------------------
+  # Like Service
+  # ----------------------------
+  like-db:
+    image: postgres:15-alpine
+    container_name: like_service_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: like_service_db
+    ports:
+      - "5437:5432"
+    volumes:
+      - like_pgdata:/var/lib/postgresql/data
+      - ./like-service/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  like-service:
+    build:
+      context: ./like-service
+      dockerfile: Dockerfile
+    container_name: like-service
+    ports:
+      - "50057:50057"
+    environment:
+      LIKE_DB_HOST: like-db
+      LIKE_DB_PORT: 5432
+      LIKE_DB_USER: postgres
+      LIKE_DB_PASSWORD: postgres
+      LIKE_DB_NAME: like_service_db
+      LIKE_DB_SSLMODE: disable
+      GRPC_PORT: 50057
+    depends_on:
+      like-db:
+        condition: service_healthy
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # ----------------------------
+  # Follow Service
+  # ----------------------------
+  follow-db:
+    image: postgres:15-alpine
+    container_name: follow_service_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: follow_service_db
+    ports:
+      - "5438:5432"
+    volumes:
+      - follow_pgdata:/var/lib/postgresql/data
+      - ./follow-service/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  follow-service:
+    build:
+      context: ./follow-service
+      dockerfile: Dockerfile
+    container_name: follow-service
+    ports:
+      - "50055:50055"
+    environment:
+      FOLLOW_DB_HOST: follow-db
+      FOLLOW_DB_PORT: 5432
+      FOLLOW_DB_USER: postgres
+      FOLLOW_DB_PASSWORD: postgres
+      FOLLOW_DB_NAME: follow_service_db
+      FOLLOW_DB_SSLMODE: disable
+      GRPC_PORT: 50055
+    depends_on:
+      follow-db:
+        condition: service_healthy
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # ----------------------------
+  # Feed Service
+  # ----------------------------
+  feed-db:
+    image: postgres:15-alpine
+    container_name: feed_service_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: feed_service_db
+    ports:
+      - "5439:5432"
+    volumes:
+      - feed_pgdata:/var/lib/postgresql/data
+      - ./feed-service/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  feed-redis:
+    image: redis:7-alpine
+    container_name: feed_service_redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - feed_redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  feed-service:
+    build:
+      context: ./feed-service
+      dockerfile: Dockerfile
+    container_name: feed-service
+    ports:
+      - "50054:50054"
+    environment:
+      FEED_DB_HOST: feed-db
+      FEED_DB_PORT: 5432
+      FEED_DB_USER: postgres
+      FEED_DB_PASSWORD: postgres
+      FEED_DB_NAME: feed_service_db
+      FEED_DB_SSLMODE: disable
+      REDIS_HOST: feed-redis
+      REDIS_PORT: 6379
+      GRPC_PORT: 50054
+    depends_on:
+      feed-db:
+        condition: service_healthy
+      feed-redis:
+        condition: service_healthy
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # ----------------------------
+  # Notification Service
+  # ----------------------------
+  notification-db:
+    image: postgres:15-alpine
+    container_name: notification_service_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: notification_service_db
+    ports:
+      - "5440:5432"
+    volumes:
+      - notification_pgdata:/var/lib/postgresql/data
+      - ./notification-service/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  notification-redis:
+    image: redis:7-alpine
+    container_name: notification_service_redis
+    ports:
+      - "6381:6379"
+    volumes:
+      - notification_redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    ports:
+      - "50058:50058"
+    environment:
+      NOTIFICATION_DB_HOST: notification-db
+      NOTIFICATION_DB_PORT: 5432
+      NOTIFICATION_DB_USER: postgres
+      NOTIFICATION_DB_PASSWORD: postgres
+      NOTIFICATION_DB_NAME: notification_service_db
+      NOTIFICATION_DB_SSLMODE: disable
+      REDIS_HOST: notification-redis
+      REDIS_PORT: 6379
+      GRPC_PORT: 50058
+    depends_on:
+      notification-db:
+        condition: service_healthy
+      notification-redis:
+        condition: service_healthy
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # ----------------------------
+  # GraphQL API Gateway
+  # ----------------------------
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      NATS_URL: nats://nats:4222
+      AUTH_SERVICE_ADDR: auth-service:50051
+      USER_SERVICE_ADDR: user-service:50052
+      POST_SERVICE_ADDR: post-service:50053
+      COMMENT_SERVICE_ADDR: comment-service:50056
+      LIKE_SERVICE_ADDR: like-service:50057
+      FOLLOW_SERVICE_ADDR: follow-service:50055
+      NOTIFICATION_SERVICE_ADDR: notification-service:50058
+      FEED_SERVICE_ADDR: feed-service:50054
+    depends_on:
+      - nats
+      - auth-service
+      - user-service
+      - post-service
+      - comment-service
+      - like-service
+      - follow-service
+      - notification-service
+      - feed-service
+    networks:
+      - microservices
+    restart: unless-stopped
+
+# ----------------------------
+# Networks
+# ----------------------------
+networks:
+  microservices:
+    driver: bridge
+
+# ----------------------------
+# Volumes
+# ----------------------------
+volumes:
+  auth_pgdata:
+  user_pgdata:
+  post_pgdata:
+  comment_pgdata:
+  like_pgdata:
+  follow_pgdata:
+  feed_pgdata:
+  notification_pgdata:
+  feed_redis_data:
+  notification_redis_data:

@@ -1,0 +1,54 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: user_service_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: user_service_db  
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql  
+    networks:
+      - user-service-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  user-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: user-service
+    ports:
+      - "50052:50052"
+    environment:
+      USER_DB_HOST: postgres
+      USER_DB_PORT: 5432
+      USER_DB_USER: postgres
+      USER_DB_PASSWORD: postgres
+      USER_DB_NAME: user_service_db
+      USER_DB_SSLMODE: disable
+      USER_DB_MAX_OPEN_CONNS: 25
+      USER_DB_MAX_IDLE_CONNS: 5
+      USER_DB_MAX_LIFETIME: 5m
+      GRPC_PORT: 50052
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - user-service-network
+    restart: unless-stopped
+
+networks:
+  user-service-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+package comment;
+
+option go_package = "./";
+
+import "google/protobuf/timestamp.proto";
+
+// ============================================
+// COMMENT SERVICE
+// ============================================
+
+service CommentService {
+  rpc CreateComment(CreateCommentRequest) returns (Comment);
+  rpc GetPostComments(GetPostCommentsRequest) returns (CommentConnection);
+  rpc UpdateComment(UpdateCommentRequest) returns (Comment);
+  rpc DeleteComment(DeleteCommentRequest) returns (Response);
+}
+
+// ============================================
+// MESSAGES
+// ============================================
+
+message CreateCommentRequest {
+  string post_id = 1;
+  string user_id = 2;
+  string content = 3;
+}
+
+message GetPostCommentsRequest {
+  string post_id = 1;
+  int32 first = 2;
+  optional string after = 3;
+}
+
+message UpdateCommentRequest {
+  string comment_id = 1;
+  string user_id = 2;
+  string content = 3;
+}
+
+message DeleteCommentRequest {
+  string comment_id = 1;
+  string user_id = 2;
+}
+
+message Comment {
+  string id = 1;
+  string post_id = 2;
+  string user_id = 3;
+  string content = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message CommentEdge {
+  string cursor = 1;
+  Comment node = 2;
+}
+
+message PageInfo {
+  optional string end_cursor = 1;
+  bool has_next_page = 2;
+  optional string start_cursor = 3;
+  bool has_previous_page = 4;
+}
+
+message CommentConnection {
+  repeated CommentEdge edges = 1;
+  PageInfo page_info = 2;
+  int32 total_count = 3;
+}
+
+message Response {
+  bool success = 1;
+  string message = 2;
+}

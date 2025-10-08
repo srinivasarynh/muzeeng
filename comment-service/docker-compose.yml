@@ -1,0 +1,54 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: comment_service_db
+    environment:
+      POSTGRES_AUTH: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: comment_service_db  
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql  
+    networks:
+      - comment-service-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  comment-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: comment-service
+    ports:
+      - "50056:50056"
+    environment:
+      COMMENT_DB_HOST: postgres
+      COMMENT_DB_PORT: 5432
+      COMMENT_DB_USER: postgres
+      COMMENT_DB_PASSWORD: postgres
+      COMMENT_DB_NAME: comment_service_db
+      COMMENT_DB_SSLMODE: disable
+      COMMENT_DB_MAX_OPEN_CONNS: 25
+      COMMENT_DB_MAX_IDLE_CONNS: 5
+      COMMENT_DB_MAX_LIFETIME: 5m
+      GRPC_PORT: 50056
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - comment-service-network
+    restart: unless-stopped
+
+networks:
+  comment-service-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

@@ -1,0 +1,330 @@
+# GraphQL API Gateway Schema with JWT Authentication
+# Designed for gRPC microservices integration
+
+# ============================================
+# DIRECTIVES
+# ============================================
+
+"""
+Requires valid JWT token for this field/type
+"""
+directive @auth on FIELD_DEFINITION | OBJECT
+
+"""
+Requires specific roles to access this field
+"""
+directive @hasRole(roles: [Role!]!) on FIELD_DEFINITION
+
+# NOTE: Removed @grpc directive - we handle gRPC calls manually in resolvers
+
+# ============================================
+# SCALARS
+# ============================================
+
+scalar UUID
+scalar DateTime
+scalar JWT
+
+# ============================================
+# ENUMS
+# ============================================
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum NotificationType {
+  LIKE
+  COMMENT
+  FOLLOW
+}
+
+# ============================================
+# QUERY TYPE
+# ============================================
+
+type Query {
+  # Public queries (no auth required)
+  healthCheck: HealthCheckResponse!
+  
+  # Protected queries (require JWT)
+  me: User! @auth
+  
+  getProfile(userId: UUID!): User
+  
+  getPost(postId: UUID!): Post
+  
+  getUserPosts(
+    userId: UUID!
+    first: Int = 10
+    after: String
+  ): PostConnection!
+  
+  getFeed(
+    first: Int = 10
+    after: String
+  ): PostConnection! @auth
+  
+  getPostComments(
+    postId: UUID!
+    first: Int = 10
+    after: String
+  ): CommentConnection!
+  
+  getPostLikes(postId: UUID!): LikeInfo!
+  
+  getFollowers(
+    userId: UUID!
+    first: Int = 10
+    after: String
+  ): FollowConnection!
+  
+  getFollowing(
+    userId: UUID!
+    first: Int = 10
+    after: String
+  ): FollowConnection!
+  
+  getNotifications(
+    first: Int = 10
+    after: String
+  ): NotificationConnection! @auth
+}
+
+# ============================================
+# MUTATION TYPE
+# ============================================
+
+type Mutation {
+  # Authentication mutations (no auth required)
+  register(input: RegisterInput!): AuthResponse!
+  
+  login(input: LoginInput!): AuthResponse!
+  
+  refreshToken(refreshToken: String!): AuthResponse!
+  
+  # Protected mutations (require JWT)
+  logout: Response! @auth
+  
+  updateProfile(input: UpdateProfileInput!): User! @auth
+  
+  changePassword(input: ChangePasswordInput!): Response! @auth
+  
+  createPost(input: CreatePostInput!): Post! @auth
+  
+  updatePost(postId: UUID!, content: String!): Post! @auth
+  
+  deletePost(postId: UUID!): Response! @auth
+  
+  createComment(input: CreateCommentInput!): Comment! @auth
+  
+  updateComment(commentId: UUID!, content: String!): Comment! @auth
+  
+  deleteComment(commentId: UUID!): Response! @auth
+  
+  likePost(postId: UUID!): Response! @auth
+  
+  unlikePost(postId: UUID!): Response! @auth
+  
+  followUser(userId: UUID!): Response! @auth
+  
+  unfollowUser(userId: UUID!): Response! @auth
+  
+  markNotificationRead(notificationId: UUID!): Response! @auth
+  
+  markAllNotificationsRead: Response! @auth
+}
+
+# ============================================
+# SUBSCRIPTION TYPE
+# ============================================
+
+type Subscription {
+  notificationAdded: Notification! @auth
+  
+  postAdded(userId: UUID!): Post! @auth
+  
+  commentAdded(postId: UUID!): Comment!
+}
+
+# ============================================
+# INPUT TYPES
+# ============================================
+
+input RegisterInput {
+  username: String!
+  email: String!
+  password: String!
+  bio: String
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
+input UpdateProfileInput {
+  username: String
+  email: String
+  bio: String
+}
+
+input ChangePasswordInput {
+  currentPassword: String!
+  newPassword: String!
+}
+
+input CreatePostInput {
+  content: String!
+}
+
+input CreateCommentInput {
+  postId: UUID!
+  content: String!
+}
+
+# ============================================
+# OBJECT TYPES
+# ============================================
+
+type User {
+  id: UUID!
+  username: String!
+  email: String! @auth
+  bio: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  followersCount: Int!
+  followingCount: Int!
+  postsCount: Int!
+  isFollowing: Boolean @auth
+}
+
+type Post {
+  id: UUID!
+  userId: UUID!
+  user: User!
+  content: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  likesCount: Int!
+  commentsCount: Int!
+  isLiked: Boolean @auth
+  comments(first: Int = 5, after: String): CommentConnection!
+}
+
+type Comment {
+  id: UUID!
+  postId: UUID!
+  userId: UUID!
+  user: User!
+  content: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Notification {
+  id: UUID!
+  userId: UUID!
+  type: NotificationType!
+  message: String!
+  actorId: UUID
+  actor: User
+  relatedId: UUID
+  isRead: Boolean!
+  createdAt: DateTime!
+}
+
+type AuthResponse {
+  accessToken: JWT!
+  refreshToken: JWT!
+  user: User!
+  expiresIn: Int!
+  message: String
+}
+
+type Response {
+  success: Boolean!
+  message: String!
+}
+
+type HealthCheckResponse {
+  status: String!
+  timestamp: DateTime!
+  services: [ServiceStatus!]!
+}
+
+type ServiceStatus {
+  name: String!
+  status: String!
+  latency: Int
+}
+
+type LikeInfo {
+  count: Int!
+  isLikedByCurrentUser: Boolean @auth
+  recentLikers: [User!]!
+}
+
+# ============================================
+# CONNECTION TYPES (Pagination)
+# ============================================
+
+type PageInfo {
+  endCursor: String
+  hasNextPage: Boolean!
+  startCursor: String
+  hasPreviousPage: Boolean!
+}
+
+type PostEdge {
+  cursor: String!
+  node: Post!
+}
+
+type PostConnection {
+  edges: [PostEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type CommentEdge {
+  cursor: String!
+  node: Comment!
+}
+
+type CommentConnection {
+  edges: [CommentEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type UserEdge {
+  cursor: String!
+  node: User!
+}
+
+type FollowEdge {
+  cursor: String!
+  node: User!
+  followedAt: DateTime!
+}
+
+type FollowConnection {
+  edges: [FollowEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type NotificationEdge {
+  cursor: String!
+  node: Notification!
+}
+
+type NotificationConnection {
+  edges: [NotificationEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+  unreadCount: Int!
+}

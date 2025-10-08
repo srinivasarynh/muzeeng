@@ -1,0 +1,110 @@
+syntax = "proto3";
+
+package follow;
+
+option go_package = "./";
+
+import "google/protobuf/timestamp.proto";
+
+// ============================================
+// FOLLOW SERVICE
+// ============================================
+
+service FollowService {
+  rpc FollowUser(FollowUserRequest) returns (Response);
+  rpc UnfollowUser(UnfollowUserRequest) returns (Response);
+  rpc GetFollowers(GetFollowersRequest) returns (FollowConnection);
+  rpc GetFollowing(GetFollowingRequest) returns (FollowConnection);
+  rpc IsFollowing(IsFollowingRequest) returns (IsFollowingResponse);
+  rpc GetFollowStatus(GetFollowStatusRequest) returns (GetFollowStatusResponse);
+  rpc GetFollowersCounts(GetFollowersCountsRequest) returns (GetFollowersCountsResponse);
+}
+
+// ============================================
+// MESSAGES
+// ============================================
+
+message FollowUserRequest {
+  string follower_id = 1; // User who is following
+  string following_id = 2; // User being followed
+}
+
+message UnfollowUserRequest {
+  string follower_id = 1;
+  string following_id = 2;
+}
+
+message GetFollowersRequest {
+  string user_id = 1;
+  int32 first = 2;
+  optional string after = 3;
+  optional string requesting_user_id = 4;
+}
+
+message GetFollowingRequest {
+  string user_id = 1;
+  int32 first = 2;
+  optional string after = 3;
+  optional string requesting_user_id = 4;
+}
+
+message IsFollowingRequest {
+  string follower_id = 1;
+  string following_id = 2;
+}
+
+message IsFollowingResponse {
+  bool is_following = 1;
+}
+
+message GetFollowStatusRequest {
+  string user_id = 1;
+  repeated string target_user_ids = 2;
+}
+
+message FollowStatus {
+  string user_id = 1;
+  bool is_following = 2;
+}
+
+message GetFollowStatusResponse {
+  repeated FollowStatus statuses = 1;
+}
+
+message GetFollowersCountsRequest {
+  repeated string user_ids = 1;
+}
+
+message UserFollowCounts {
+  string user_id = 1;
+  int32 followers_count = 2;
+  int32 following_count = 3;
+}
+
+message GetFollowersCountsResponse {
+  repeated UserFollowCounts counts = 1;
+}
+
+message FollowEdge {
+  string cursor = 1;
+  string user_id = 2;
+  google.protobuf.Timestamp followed_at = 3;
+}
+
+message PageInfo {
+  optional string end_cursor = 1;
+  bool has_next_page = 2;
+  optional string start_cursor = 3;
+  bool has_previous_page = 4;
+}
+
+message FollowConnection {
+  repeated FollowEdge edges = 1;
+  PageInfo page_info = 2;
+  int32 total_count = 3;
+}
+
+message Response {
+  bool success = 1;
+  string message = 2;
+}

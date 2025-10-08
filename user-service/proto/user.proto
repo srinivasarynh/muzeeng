@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package user;
+
+option go_package = "./";
+
+import "google/protobuf/timestamp.proto";
+
+// ============================================
+// USER SERVICE
+// ============================================
+
+service UserService {
+  rpc GetMe(GetMeRequest) returns (User);
+  rpc GetProfile(GetProfileRequest) returns (User);
+  rpc UpdateProfile(UpdateProfileRequest) returns (User);
+  rpc GetUsersByIds(GetUsersByIdsRequest) returns (GetUsersByIdsResponse);
+  rpc IncrementPostsCount(IncrementPostsCountRequest) returns (Response);
+  rpc DecrementPostsCount(DecrementPostsCountRequest) returns (Response);
+}
+
+// ============================================
+// MESSAGES
+// ============================================
+
+message GetMeRequest {
+  string user_id = 1;
+  optional string requesting_user_id = 2; // For isFollowing field
+}
+
+message GetProfileRequest {
+  string user_id = 1;
+  optional string requesting_user_id = 2; // For isFollowing field
+}
+
+message UpdateProfileRequest {
+  string user_id = 1;
+  optional string username = 2;
+  optional string email = 3;
+  optional string bio = 4;
+}
+
+message GetUsersByIdsRequest {
+  repeated string user_ids = 1;
+  optional string requesting_user_id = 2;
+}
+
+message GetUsersByIdsResponse {
+  repeated User users = 1;
+}
+
+message IncrementPostsCountRequest {
+  string user_id = 1;
+}
+
+message DecrementPostsCountRequest {
+  string user_id = 1;
+}
+
+message User {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+  optional string bio = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  int32 followers_count = 7;
+  int32 following_count = 8;
+  int32 posts_count = 9;
+  optional bool is_following = 10; // Only set if requesting_user_id provided
+}
+
+message Response {
+  bool success = 1;
+  string message = 2;
+}

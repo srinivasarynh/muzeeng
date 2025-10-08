@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package like;
+
+option go_package = "./";
+
+// ============================================
+// LIKE SERVICE
+// ============================================
+
+service LikeService {
+  rpc LikePost(LikePostRequest) returns (Response);
+  rpc UnlikePost(UnlikePostRequest) returns (Response);
+  rpc GetPostLikes(GetPostLikesRequest) returns (LikeInfo);
+  rpc IsPostLikedByUser(IsPostLikedByUserRequest) returns (IsPostLikedByUserResponse);
+  rpc GetPostLikesByUsers(GetPostLikesByUsersRequest) returns (GetPostLikesByUsersResponse);
+}
+
+// ============================================
+// MESSAGES
+// ============================================
+
+message LikePostRequest {
+  string post_id = 1;
+  string user_id = 2;
+}
+
+message UnlikePostRequest {
+  string post_id = 1;
+  string user_id = 2;
+}
+
+message GetPostLikesRequest {
+  string post_id = 1;
+  optional string requesting_user_id = 2;
+  int32 recent_likers_limit = 3; // Default 5
+}
+
+message IsPostLikedByUserRequest {
+  string post_id = 1;
+  string user_id = 2;
+}
+
+message IsPostLikedByUserResponse {
+  bool is_liked = 1;
+}
+
+message GetPostLikesByUsersRequest {
+  repeated string post_ids = 1;
+  string user_id = 2;
+}
+
+message PostLikeStatus {
+  string post_id = 1;
+  bool is_liked = 2;
+}
+
+message GetPostLikesByUsersResponse {
+  repeated PostLikeStatus likes = 1;
+}
+
+message LikeInfo {
+  int32 count = 1;
+  optional bool is_liked_by_current_user = 2;
+  repeated string recent_liker_ids = 3;
+}
+
+message Response {
+  bool success = 1;
+  string message = 2;
+}

@@ -1,0 +1,82 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: feed_service_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: feed_service_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - feed-service-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: feed_service_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - feed-service-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+  feed-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: feed-service
+    ports:
+      - "50054:50054"
+    environment:
+      # Database
+      FEED_DB_HOST: postgres
+      FEED_DB_PORT: 5432
+      FEED_DB_USER: postgres
+      FEED_DB_PASSWORD: postgres
+      FEED_DB_NAME: feed_service_db
+      FEED_DB_SSLMODE: disable
+      FEED_DB_MAX_OPEN_CONNS: 25
+      FEED_DB_MAX_IDLE_CONNS: 5
+      FEED_DB_MAX_LIFETIME: 5m
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: 0
+      REDIS_MAX_RETRIES: 3
+      REDIS_POOL_SIZE: 10
+      # gRPC
+      GRPC_PORT: 50054
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - feed-service-network
+    restart: unless-stopped
+
+networks:
+  feed-service-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -1,0 +1,327 @@
+version: "3.8"
+
+services:
+  # ----------------------------
+  # NATS
+  # ----------------------------
+  nats:
+    image: nats:2.9.21-alpine
+    container_name: nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # ----------------------------
+  # PostgreSQL (single instance for all microservices)
+  # ----------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: microservices_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # ----------------------------
+  # Redis (for Feed and Notification services)
+  # ----------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # ----------------------------
+  # Auth Service
+  # ----------------------------
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    ports:
+      - "50051:50051"
+    environment:
+      AUTH_DB_HOST: postgres
+      AUTH_DB_PORT: 5432
+      AUTH_DB_USER: postgres
+      AUTH_DB_PASSWORD: postgres
+      AUTH_DB_NAME: auth_service_db
+      AUTH_DB_SSLMODE: disable
+      GRPC_PORT: 50051
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # ----------------------------
+  # User Service
+  # ----------------------------
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    container_name: user-service
+    ports:
+      - "50052:50052"
+    environment:
+      USER_DB_HOST: postgres
+      USER_DB_PORT: 5432
+      USER_DB_USER: postgres
+      USER_DB_PASSWORD: postgres
+      USER_DB_NAME: user_service_db
+      USER_DB_SSLMODE: disable
+      GRPC_PORT: 50052
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # ----------------------------
+  # Post Service
+  # ----------------------------
+  post-service:
+    build:
+      context: ./post-service
+      dockerfile: Dockerfile
+    container_name: post-service
+    ports:
+      - "50053:50053"
+    environment:
+      POST_DB_HOST: postgres
+      POST_DB_PORT: 5432
+      POST_DB_USER: postgres
+      POST_DB_PASSWORD: postgres
+      POST_DB_NAME: post_service_db
+      POST_DB_SSLMODE: disable
+      GRPC_PORT: 50053
+      NATS_URL: nats://nats:4222
+      NATS_CLIENT_ID: post-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:                     
+        condition: service_started
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # ----------------------------
+  # Comment Service
+  # ----------------------------
+  comment-service:
+    build:
+      context: ./comment-service
+      dockerfile: Dockerfile
+    container_name: comment-service
+    ports:
+      - "50056:50056"
+    environment:
+      COMMENT_DB_HOST: postgres
+      COMMENT_DB_PORT: 5432
+      COMMENT_DB_USER: postgres
+      COMMENT_DB_PASSWORD: postgres
+      COMMENT_DB_NAME: comment_service_db
+      COMMENT_DB_SSLMODE: disable
+      GRPC_PORT: 50056
+      NATS_URL: nats://nats:4222
+      NATS_CLIENT_ID: comment-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:                     
+        condition: service_started
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # ----------------------------
+  # Like Service
+  # ----------------------------
+  like-service:
+    build:
+      context: ./like-service
+      dockerfile: Dockerfile
+    container_name: like-service
+    ports:
+      - "50057:50057"
+    environment:
+      LIKE_DB_HOST: postgres
+      LIKE_DB_PORT: 5432
+      LIKE_DB_USER: postgres
+      LIKE_DB_PASSWORD: postgres
+      LIKE_DB_NAME: like_service_db
+      LIKE_DB_SSLMODE: disable
+      GRPC_PORT: 50057
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # ----------------------------
+  # Follow Service
+  # ----------------------------
+  follow-service:
+    build:
+      context: ./follow-service
+      dockerfile: Dockerfile
+    container_name: follow-service
+    ports:
+      - "50055:50055"
+    environment:
+      FOLLOW_DB_HOST: postgres
+      FOLLOW_DB_PORT: 5432
+      FOLLOW_DB_USER: postgres
+      FOLLOW_DB_PASSWORD: postgres
+      FOLLOW_DB_NAME: follow_service_db
+      FOLLOW_DB_SSLMODE: disable
+      GRPC_PORT: 50055
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # ----------------------------
+  # Feed Service
+  # ----------------------------
+  feed-service:
+    build:
+      context: ./feed-service
+      dockerfile: Dockerfile
+    container_name: feed-service
+    ports:
+      - "50054:50054"
+    environment:
+      FEED_DB_HOST: postgres
+      FEED_DB_PORT: 5432
+      FEED_DB_USER: postgres
+      FEED_DB_PASSWORD: postgres
+      FEED_DB_NAME: feed_service_db
+      FEED_DB_SSLMODE: disable
+      REDIS_URL: redis:6379      
+      REDIS_PASSWORD: ""          
+      REDIS_DB: 0         
+      GRPC_PORT: 50054
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - microservices
+    restart: unless-stopped
+  # ----------------------------
+  # Notification Service
+  # ----------------------------
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    ports:
+      - "50058:50058"
+    environment:
+      NOTIFICATION_DB_HOST: postgres
+      NOTIFICATION_DB_PORT: 5432
+      NOTIFICATION_DB_USER: postgres
+      NOTIFICATION_DB_PASSWORD: postgres
+      NOTIFICATION_DB_NAME: notification_service_db
+      NOTIFICATION_DB_SSLMODE: disable
+      REDIS_URL: redis:6379      
+      REDIS_PASSWORD: ""          
+      REDIS_DB: 0                
+      GRPC_PORT: 50058
+      NATS_URL: nats://nats:4222
+      NATS_CLIENT_ID: notification-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:                     
+        condition: service_started
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # ----------------------------
+  # GraphQL API Gateway
+  # ----------------------------
+  api-gateway:
+    build:
+      context: .
+      dockerfile: ./api-gateway/Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      NATS_URL: nats://nats:4222
+      AUTH_SERVICE_ADDR: auth-service:50051
+      USER_SERVICE_ADDR: user-service:50052
+      POST_SERVICE_ADDR: post-service:50053
+      COMMENT_SERVICE_ADDR: comment-service:50056
+      LIKE_SERVICE_ADDR: like-service:50057
+      FOLLOW_SERVICE_ADDR: follow-service:50055
+      NOTIFICATION_SERVICE_ADDR: notification-service:50058
+      FEED_SERVICE_ADDR: feed-service:50054
+    depends_on:
+      - nats
+      - auth-service
+      - user-service
+      - post-service
+      - comment-service
+      - like-service
+      - follow-service
+      - notification-service
+      - feed-service
+    networks:
+      - microservices
+    restart: unless-stopped
+
+# ----------------------------
+# Networks
+# ----------------------------
+networks:
+  microservices:
+    driver: bridge
+
+# ----------------------------
+# Volumes
+# ----------------------------
+volumes:
+  pgdata:
+  redis_data:

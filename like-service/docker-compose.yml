@@ -1,0 +1,54 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: like_service_db
+    environment:
+      POSTGRES_AUTH: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: like_service_db  
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql  
+    networks:
+      - like-service-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  like-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: like-service
+    ports:
+      - "50057:50057"
+    environment:
+      LIKE_DB_HOST: postgres
+      LIKE_DB_PORT: 5432
+      LIKE_DB_USER: postgres
+      LIKE_DB_PASSWORD: postgres
+      LIKE_DB_NAME: like_service_db
+      LIKE_DB_SSLMODE: disable
+      LIKE_DB_MAX_OPEN_CONNS: 25
+      LIKE_DB_MAX_IDLE_CONNS: 5
+      LIKE_DB_MAX_LIFETIME: 5m
+      GRPC_PORT: 50057
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - like-service-network
+    restart: unless-stopped
+
+networks:
+  like-service-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

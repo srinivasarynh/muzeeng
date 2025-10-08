@@ -1,0 +1,82 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: notification_service_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: notification_service_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - notification-service-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: notification_service_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - notification-service-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: notification-service
+    ports:
+      - "50058:50058"
+    environment:
+      # Database
+      NOTIFICATION_DB_HOST: postgres
+      NOTIFICATION_DB_PORT: 5432
+      NOTIFICATION_DB_USER: postgres
+      NOTIFICATION_DB_PASSWORD: postgres
+      NOTIFICATION_DB_NAME: notification_service_db
+      NOTIFICATION_DB_SSLMODE: disable
+      NOTIFICATION_DB_MAX_OPEN_CONNS: 25
+      NOTIFICATION_DB_MAX_IDLE_CONNS: 5
+      NOTIFICATION_DB_MAX_LIFETIME: 5m
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: 0
+      REDIS_MAX_RETRIES: 3
+      REDIS_POOL_SIZE: 10
+      # gRPC
+      GRPC_PORT: 50058
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - notification-service-network
+    restart: unless-stopped
+
+networks:
+  notification-service-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
