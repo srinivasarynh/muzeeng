@@ -10,26 +10,26 @@ It supports **queries, mutations, and subscriptions**, with **JWT authentication
 ### **High-Level Design**
 
                ┌────────────────────────┐  
-               │     Client (Web/Mobile)                         │  
+               │     Client (Web/Mobile)│  
                └────────────┬───────────┘  
-                                                │ GraphQL over HTTP/WebSocket  
-                                               ▼  
+                            │ GraphQL over HTTP/WebSocket  
+                            ▼  
                   ┌───────────────────────┐  
-                  │  GraphQL API Gateway  	         │  
-                  │ (gRPC Resolver Layer)                     │  
+                  │  GraphQL API Gateway  │  
+                  │ (gRPC Resolver Layer) │  
                   └──────────┬────────────┘  
          ┌────────────────┼────────────────┐  
-         ▼                                        ▼                                        ▼  
+         ▼                ▼                ▼  
  ┌────────────┐       ┌────────────┐        ┌────────────┐  
- │ auth-svc                 │       │ post-svc                │         │ user-svc                │  
+ │ auth-svc   │       │ post-svc   │        │ user-svc   │  
  └────────────┘       └────────────┘        └────────────┘  
-         ▼                                        ▼                                          ▼  
+         ▼                   ▼                    ▼  
  ┌────────────┐       ┌────────────┐        ┌────────────┐  
- │ follow-svc               │       │ like-svc                  │        │ comment-svc         │  
+ │ follow-svc │       │ like-svc   │        │ comment-svc│  
  └────────────┘       └────────────┘        └────────────┘  
          ▼                   ▼                    ▼  
  ┌────────────┐       ┌────────────┐  
- │ feed-svc                 │       │ notification-svc      │  
+ │ feed-svc   │       │ notification-svc │  
  └────────────┘       └───── ──────┘
 
 Each service is independent, communicates over **gRPC**, and exposes well-defined protobuf contracts.
@@ -211,32 +211,38 @@ Before starting, ensure you have installed:
 ## **Setup Steps**
 
 ### Step 1: Clone the repository
+git clone https://github.com/srinivasarynh/muzeeng
+cd muzeeng
 
-### Step 2: Install Go dependencies
+### Step 2: Install Go dependencies inside each service
+go mod tidy
 
 ### Step 3: Generate gRPC code from proto files
+protoc --go_out=pb --go-grpc_out=pb proto/*.proto
 
 ### Step 4: Generate GraphQL types & resolvers
+cd api-gateway
+gqlgen generate
 
-### Step 5: Build Docker images
-
-## **Running the Project**
-
+### Step 5: Build Docker images and Running the Project using BASH script file
 ./run-all.sh   
+
+### Step 6: Kill Docker Container and Stop the Project
+docker-compose down -v
 
 ### **Option 2: Run services locally (for development)**
 
 \# Start auth service  
-cd microservices/auth-service  
+cd auth-service  
 go run [main.go](http://main.go)
 
 \# Start post service  
-cd microservices/post-service  
+cd post-service  
 go run main.go
 
 \# Start GraphQL gateway  
-cd graphql-gateway  
-go run cmd/gateway/main.go
+cd api-gateway  
+go run server.go
 
 **Common Development Commands**
 
