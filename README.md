@@ -81,7 +81,7 @@ All services communicate over **gRPC** with **Protocol Buffers (protobuf)** as t
 | **Schema Management** | `schema.graphql` |
 | **Containerization** | Docker / Docker Compose |
 | **Persistence** | PostgreSQL / Redis (depending on service) |
-|  |  |
+| **NATS** | Publisher and Subscriber |
 
 **Project Structure**
 
