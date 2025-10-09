@@ -1,8 +1,11 @@
 version: "3.8"
 
 services:
+  # ----------------------------
+  # PostgreSQL (for Notification Service)
+  # ----------------------------
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: notification_service_db
     environment:
       POSTGRES_USER: postgres
@@ -11,16 +14,20 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - notification-service-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - notification-service-network
+    restart: unless-stopped
 
+  # ----------------------------
+  # Redis (for Notification Service)
+  # ----------------------------
   redis:
     image: redis:7-alpine
     container_name: notification_service_redis
@@ -28,15 +35,32 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    networks:
-      - notification-service-network
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    networks:
+      - notification-service-network
+    restart: unless-stopped
 
+  # ----------------------------
+  # NATS (for Event Communication)
+  # ----------------------------
+  nats:
+    image: nats:2.9.21-alpine
+    container_name: nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    networks:
+      - notification-service-network
+    restart: unless-stopped
+
+  # ----------------------------
+  # Notification Service
+  # ----------------------------
   notification-service:
     build:
       context: .
@@ -52,16 +76,16 @@ services:
       NOTIFICATION_DB_PASSWORD: postgres
       NOTIFICATION_DB_NAME: notification_service_db
       NOTIFICATION_DB_SSLMODE: disable
-      NOTIFICATION_DB_MAX_OPEN_CONNS: 25
-      NOTIFICATION_DB_MAX_IDLE_CONNS: 5
-      NOTIFICATION_DB_MAX_LIFETIME: 5m
+
       # Redis
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+      REDIS_URL: redis:6379
       REDIS_PASSWORD: ""
       REDIS_DB: 0
-      REDIS_MAX_RETRIES: 3
-      REDIS_POOL_SIZE: 10
+
+      # NATS
+      NATS_URL: nats://nats:4222
+      NATS_CLIENT_ID: notification-service
+
       # gRPC
       GRPC_PORT: 50058
     depends_on:
@@ -69,14 +93,22 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      nats:
+        condition: service_started
     networks:
       - notification-service-network
     restart: unless-stopped
 
+# ----------------------------
+# Networks
+# ----------------------------
 networks:
   notification-service-network:
     driver: bridge
 
+# ----------------------------
+# Volumes
+# ----------------------------
 volumes:
-  postgres_data:
+  pgdata:
   redis_data:

@@ -1,8 +1,11 @@
 version: "3.8"
 
 services:
+  # ----------------------------
+  # PostgreSQL (for Feed Service)
+  # ----------------------------
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: feed_service_db
     environment:
       POSTGRES_USER: postgres
@@ -11,16 +14,20 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - feed-service-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - feed-service-network
+    restart: unless-stopped
 
+  # ----------------------------
+  # Redis (for Feed Service)
+  # ----------------------------
   redis:
     image: redis:7-alpine
     container_name: feed_service_redis
@@ -28,15 +35,19 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    networks:
-      - feed-service-network
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    networks:
+      - feed-service-network
+    restart: unless-stopped
 
+  # ----------------------------
+  # Feed Service
+  # ----------------------------
   feed-service:
     build:
       context: .
@@ -52,16 +63,12 @@ services:
       FEED_DB_PASSWORD: postgres
       FEED_DB_NAME: feed_service_db
       FEED_DB_SSLMODE: disable
-      FEED_DB_MAX_OPEN_CONNS: 25
-      FEED_DB_MAX_IDLE_CONNS: 5
-      FEED_DB_MAX_LIFETIME: 5m
+
       # Redis
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+      REDIS_URL: redis:6379
       REDIS_PASSWORD: ""
       REDIS_DB: 0
-      REDIS_MAX_RETRIES: 3
-      REDIS_POOL_SIZE: 10
+
       # gRPC
       GRPC_PORT: 50054
     depends_on:
@@ -73,10 +80,16 @@ services:
       - feed-service-network
     restart: unless-stopped
 
+# ----------------------------
+# Networks
+# ----------------------------
 networks:
   feed-service-network:
     driver: bridge
 
+# ----------------------------
+# Volumes
+# ----------------------------
 volumes:
-  postgres_data:
+  pgdata:
   redis_data:

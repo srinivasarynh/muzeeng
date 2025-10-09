@@ -1,64 +1,62 @@
--- Enable UUID extension if not already enabled
+-- ========================================
+-- Like Service Schema (Standalone)
+-- ========================================
+
+-- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Likes table
-CREATE TABLE likes (
+-- ========================================
+-- Likes Table
+-- ========================================
+CREATE TABLE IF NOT EXISTS like_service_likes (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     post_id UUID NOT NULL,
     user_id UUID NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    
-    -- Ensure a user can only like a post once
     CONSTRAINT unique_user_post_like UNIQUE (post_id, user_id)
 );
 
--- Indexes for efficient querying
-CREATE INDEX idx_likes_post_id ON likes(post_id);
-CREATE INDEX idx_likes_user_id ON likes(user_id);
-CREATE INDEX idx_likes_created_at ON likes(created_at DESC);
+-- ========================================
+-- Indexes for Performance
+-- ========================================
+CREATE INDEX IF NOT EXISTS idx_like_service_likes_post_id ON like_service_likes(post_id);
+CREATE INDEX IF NOT EXISTS idx_like_service_likes_user_id ON like_service_likes(user_id);
+CREATE INDEX IF NOT EXISTS idx_like_service_likes_created_at ON like_service_likes(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_like_service_likes_post_user ON like_service_likes(post_id, user_id);
 
--- Composite index for checking if a specific user liked a specific post
-CREATE INDEX idx_likes_post_user ON likes(post_id, user_id);
+-- ========================================
+-- Functions
+-- ========================================
 
--- Optional: Add foreign key constraints if you have posts and users tables
--- Uncomment and modify these if needed:
--- ALTER TABLE likes 
---     ADD CONSTRAINT fk_likes_post 
---     FOREIGN KEY (post_id) 
---     REFERENCES posts(id) 
---     ON DELETE CASCADE;
---
--- ALTER TABLE likes 
---     ADD CONSTRAINT fk_likes_user 
---     FOREIGN KEY (user_id) 
---     REFERENCES users(id) 
---     ON DELETE CASCADE;
-
--- Function to get like count for a post
-CREATE OR REPLACE FUNCTION get_like_count(p_post_id UUID)
+-- Get total likes for a post
+CREATE OR REPLACE FUNCTION like_service_get_like_count(p_post_id UUID)
 RETURNS INTEGER AS $$
 BEGIN
-    RETURN (SELECT COUNT(*)::INTEGER FROM likes WHERE post_id = p_post_id);
+    RETURN (SELECT COUNT(*)::INTEGER FROM like_service_likes WHERE post_id = p_post_id);
 END;
 $$ LANGUAGE plpgsql;
 
--- Function to check if user liked a post
-CREATE OR REPLACE FUNCTION has_user_liked_post(p_post_id UUID, p_user_id UUID)
+-- Check if a specific user liked a post
+CREATE OR REPLACE FUNCTION like_service_has_user_liked_post(p_post_id UUID, p_user_id UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
-    RETURN EXISTS(SELECT 1 FROM likes WHERE post_id = p_post_id AND user_id = p_user_id);
+    RETURN EXISTS(
+        SELECT 1 FROM like_service_likes 
+        WHERE post_id = p_post_id 
+        AND user_id = p_user_id
+    );
 END;
 $$ LANGUAGE plpgsql;
 
--- Function to get recent liker IDs (last N users who liked a post)
-CREATE OR REPLACE FUNCTION get_recent_liker_ids(p_post_id UUID, p_limit INTEGER DEFAULT 10)
+-- Get recent liker IDs for a post (limit N)
+CREATE OR REPLACE FUNCTION like_service_get_recent_liker_ids(p_post_id UUID, p_limit INTEGER DEFAULT 10)
 RETURNS UUID[] AS $$
 BEGIN
     RETURN ARRAY(
-        SELECT user_id 
-        FROM likes 
-        WHERE post_id = p_post_id 
-        ORDER BY created_at DESC 
+        SELECT user_id
+        FROM like_service_likes
+        WHERE post_id = p_post_id
+        ORDER BY created_at DESC
         LIMIT p_limit
     );
 END;

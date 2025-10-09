@@ -1,26 +1,46 @@
 version: "3.8"
 
 services:
+  # ----------------------------
+  # PostgreSQL (for Comment Service)
+  # ----------------------------
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: comment_service_db
     environment:
-      POSTGRES_AUTH: postgres
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: comment_service_db  
+      POSTGRES_DB: comment_service_db
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql  
-    networks:
-      - comment-service-network
+      - pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - comment-service-network
+    restart: unless-stopped
 
+  # ----------------------------
+  # NATS (for event communication)
+  # ----------------------------
+  nats:
+    image: nats:2.9.21-alpine
+    container_name: nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    networks:
+      - comment-service-network
+    restart: unless-stopped
+
+  # ----------------------------
+  # Comment Service
+  # ----------------------------
   comment-service:
     build:
       context: .
@@ -35,20 +55,27 @@ services:
       COMMENT_DB_PASSWORD: postgres
       COMMENT_DB_NAME: comment_service_db
       COMMENT_DB_SSLMODE: disable
-      COMMENT_DB_MAX_OPEN_CONNS: 25
-      COMMENT_DB_MAX_IDLE_CONNS: 5
-      COMMENT_DB_MAX_LIFETIME: 5m
       GRPC_PORT: 50056
+      NATS_URL: nats://nats:4222
+      NATS_CLIENT_ID: comment-service
     depends_on:
       postgres:
         condition: service_healthy
+      nats:
+        condition: service_started
     networks:
       - comment-service-network
     restart: unless-stopped
 
+# ----------------------------
+# Networks
+# ----------------------------
 networks:
   comment-service-network:
     driver: bridge
 
+# ----------------------------
+# Volumes
+# ----------------------------
 volumes:
-  postgres_data:
+  pgdata:

@@ -1,26 +1,33 @@
 version: "3.8"
 
 services:
+  # ----------------------------
+  # PostgreSQL (for Follow Service)
+  # ----------------------------
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: follow_service_db
     environment:
-      POSTGRES_AUTH: postgres
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: follow_service_db  
+      POSTGRES_DB: follow_service_db
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql  
-    networks:
-      - follow-service-network
+      - pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - follow-service-network
+    restart: unless-stopped
 
+  # ----------------------------
+  # Follow Service
+  # ----------------------------
   follow-service:
     build:
       context: .
@@ -35,9 +42,6 @@ services:
       FOLLOW_DB_PASSWORD: postgres
       FOLLOW_DB_NAME: follow_service_db
       FOLLOW_DB_SSLMODE: disable
-      FOLLOW_DB_MAX_OPEN_CONNS: 25
-      FOLLOW_DB_MAX_IDLE_CONNS: 5
-      FOLLOW_DB_MAX_LIFETIME: 5m
       GRPC_PORT: 50055
     depends_on:
       postgres:
@@ -46,9 +50,15 @@ services:
       - follow-service-network
     restart: unless-stopped
 
+# ----------------------------
+# Networks
+# ----------------------------
 networks:
   follow-service-network:
     driver: bridge
 
+# ----------------------------
+# Volumes
+# ----------------------------
 volumes:
-  postgres_data:
+  pgdata:
