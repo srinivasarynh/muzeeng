@@ -41,7 +41,7 @@ services:
   auth-service:
     build:
       context: ./auth-service
-      dockerfile: Dockerfile  # ← Fixed (removed duplicate path)
+      dockerfile: Dockerfile
     container_name: auth-service
     ports:
       - "50051:50051"
@@ -425,7 +425,7 @@ services:
     restart: unless-stopped
 
   # ----------------------------
-  # GraphQL API Gateway
+  # API Gateway
   # ----------------------------
   api-gateway:
     build:
